@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "binary_heap.h"
 #include "set.h"
+#include "array.h"
 
 typedef struct _edge{
     int from, to, w;
@@ -9,40 +10,39 @@ typedef struct _edge{
 
 int edgecmp(const void *ap, const void *bp)
 {
-        edge a = * (edge *) ap;
-        edge b = * (edge *) bp;
+    edge a = * (edge *) ap;
+    edge b = * (edge *) bp;
 
-        if (a.w < b.w)
-                return -1;
-        if (a.w > b.w)
-                return 1;
-        if (a.from < b.from)
-                return -1;
-        if (a.from > b.from)
-                return 1;
-        if (a.to < b.to)
-                return -1;
-        if (a.to > b.to)
-                return 1;
-        return 0;
+    if (a.w < b.w)
+            return -1;
+    if (a.w > b.w)
+            return 1;
+    if (a.from < b.from)
+            return -1;
+    if (a.from > b.from)
+            return 1;
+    if (a.to < b.to)
+            return -1;
+    if (a.to > b.to)
+            return 1;
+    return 0;
 }
 
 int edgecmp2(const void *ap, const void *bp)
 {
-        edge a = * (edge *) ap;
-        edge b = * (edge *) bp;
-        
-        if (a.from < b.from)
-                return -1;
-        if (a.from > b.from)
-                return 1;
-        if (a.to < b.to)
-                return -1;
-        if (a.to > b.to)
-                return 1;
-        return 0;
+    edge a = * (edge *) ap;
+    edge b = * (edge *) bp;
+    
+    if (a.from < b.from)
+            return -1;
+    if (a.from > b.from)
+            return 1;
+    if (a.to < b.to)
+            return -1;
+    if (a.to > b.to)
+            return 1;
+    return 0;
 }
-
 
 int main(){
 
@@ -50,32 +50,49 @@ int main(){
     int distance;
     char** v_str;
     edge* edges;
+    size_t str_size = 0;
+    int i, j, k;
 
-    scanf("%d", &n_str);
+    scanf("%d\n", &n_str);
 
     v_str = (char**) malloc(n_str * sizeof(char*));
 
-    for (int i=0; i < n_str; i++){
-        v_str[i] = (char*) malloc(100 * sizeof(char));
+    array* a = ArrayMake();
+    char c;
+    while((c = getchar()) != '\n') {
+        ArrayPush(a, c);
+    }
+    ArrayPush(a, '\0');
+
+    str_size = a->size;
+
+    v_str[0] = a->p;
+    a->p = NULL;
+    a->max_size = 0;
+    a->size = 0;
+    ArrayFree(a);
+
+    for (i = 1; i < n_str; i++){
+        v_str[i] = (char*) malloc(str_size * sizeof(char));
     }
 
-    for (int i=0; i < n_str; i++){
+    for (int i = 1; i < n_str; i++){
         scanf("%s", v_str[i]);
     }
 
-    for (int i=0; i < n_str; i++){
-        printf("%s\n", v_str[i]);
-    }
+    //for (int i = 0; i < n_str; i++){
+    //    printf("%s\n", v_str[i]);
+    //}
 
     scanf("%d", &max_dist);
 
     edges = (edge*) malloc(n_str*(n_str-1)/2* sizeof(edge));
 
-    for (int i = 0; i < n_str; i++){
-        for (int j = i+1; j < n_str; j++){
+    for (i = 0; i < n_str; i++){
+        for (j = i+1; j < n_str; j++){
             distance = 0;
             
-            for (int k = 0; v_str[i][k] != '\0'; k++) {
+            for (k = 0; v_str[i][k] != '\0'; k++) {
                 if (v_str[i][k] != v_str[j][k])
                     ++distance;
                 if (distance > max_dist)
@@ -94,31 +111,27 @@ int main(){
     //    printf("%d %d %d \n", edges[i].from, edges[i].to, edges[i].w);
     //}
 
-    //qsort(edges, n_edges, sizeof(edge), edgecmp);
-
     binheap *q;
 
     q = BINHEAP_INIT(sizeof(edge), edges, n_edges, edgecmp);
     BINHEAP_MAKE(q, n_edges);
 
-    set* s = set_init(n_str);
+    set* s = SetInit(n_str);
 
-    for (size_t i = 0; i < n_str; i++){
-        makeSet(s, i);
-    }
+    for (i = 0; i < n_str; i++)
+        SetMake(s, i);
 
     edge* v = (edge*) malloc(sizeof(edge) * n_str);
-    int i = 0;
+    i = 0;
     //printf("--\n");
     while (! BINHEAP_EMPTY(q)) {
         edge top = edges[BINHEAP_TOP(q)];
-        if (find(s, top.from) != find(s, top.to)){
+        if (SetFind(s, top.from) != SetFind(s, top.to)){
             v[i++] = edges[BINHEAP_TOP(q)];
             //printf("%d %d\n", edges[BINHEAP_TOP(q)].from+1,
             //                edges[BINHEAP_TOP(q)].to+1);
-            Union(s, top.from, top.to);
+            SetUnion(s, top.from, top.to);
         }
-
         //printf("--%d %d\n", edges[BINHEAP_TOP(q)].from+1,
         //                    edges[BINHEAP_TOP(q)].to+1);
 
@@ -127,12 +140,19 @@ int main(){
 
     qsort(v, i, sizeof(edge), edgecmp2);
 
-    for (int j = 0; j < i; j++) {
+    for (j = 0; j < i; j++) {
         printf("%d %d\n", v[j].from+1,
                           v[j].to+1);
     }
 
     // free stuff
+    BINHEAP_FREE(q);
+    free(v);
+    free(edges);
+    for (i = 0; i < n_str; i++)
+        free(v_str[i]);
+    free(v_str);
+    SetFree(s);
 
     return 0;
 }
