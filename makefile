@@ -82,12 +82,15 @@ CC_FLAGS := -MMD $(CC_WARNINGS) $(OPTIMIZATION) -std=$(version) $(CC_ROOT)
         included files)
 
 #-------------------------------compiling-------------------------------
+
+all: $(EXECUTABLE)
+
 $(EXECUTABLE): $(OBJ_FILES) $(LIB_FILES)
-	@echo $(BOLD) linking for$(NOFORM) $(notdir $@) $(BOLD)depending$(NOFORM) $(notdir $^)
+	#@echo $(BOLD) linking for$(NOFORM) $(notdir $@) $(BOLD)depending$(NOFORM) $(notdir $^)
 	@$(CC) $(OBJ_FILES) -o $@ $(LD_FLAGS)
 
 $(OBJ_DIR)%.o: ./%.$(EXTENSION)
-	@echo $(BOLD) compiling$(NOFORM) $(notdir $@)
+	#@echo $(BOLD) compiling$(NOFORM) $(notdir $@)
 	@$(CC) -c -o $@ $< $(CC_FLAGS)
 
 # NOTE: adds the code in the dependency files to this makefile, causing the   \
