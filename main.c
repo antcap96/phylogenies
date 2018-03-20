@@ -83,27 +83,25 @@ int edgecmp3(const void *ap, const void *bp)
 edge* Kruskal(edge* edges, int n_edges, int n_nodes, 
               int (*cmp_func)(const void*, const void*), int*size){
 
+    // create the queue
     binheap *q;
-
     q = BINHEAP_INIT(sizeof(edge), edges, n_edges, cmp_func);
+    
+    // fill the queue with all the edges
     BINHEAP_MAKE(q, n_edges);
 
     set* s = SetInit(n_nodes);
 
+    // vector of edges of the MST
     edge* v = (edge*) malloc(sizeof(edge) * n_nodes);
     *size = 0;
-    //printf("--\n");
+
     while (! BINHEAP_EMPTY(q)) {
         edge top = edges[BINHEAP_TOP(q)];
         if (SetFind(s, top.from) != SetFind(s, top.to)){
             v[(*size)++] = edges[BINHEAP_TOP(q)];
-            //printf("%d %d\n", edges[BINHEAP_TOP(q)].from+1,
-            //                edges[BINHEAP_TOP(q)].to+1);
             SetUnion(s, top.from, top.to);
         }
-        //printf("--%d %d\n", edges[BINHEAP_TOP(q)].from+1,
-        //                    edges[BINHEAP_TOP(q)].to+1);
-
         BINHEAP_POP(q);
     }
 
@@ -116,15 +114,19 @@ edge* Kruskal(edge* edges, int n_edges, int n_nodes,
 // the vector output of prim includes some xFF elements that are to be ignored
 edge* Prim(edge* edges, int n_edges, int n_nodes, 
            int (*cmp_func)(const void*, const void*), int* size){
+    
+    // vector of idx to mimic adj matrix
+    // vertex_idx[i] will be the index of the begining of edges from i
+    // vertex_idx[i+1] will be the index after the end
 
-    //mimic adj from sorted edge list
-
+    // O(n)
     size_t* vertex_idx;
     vertex_idx = (size_t*) malloc((n_nodes+1) * sizeof(size_t));
 
-    //sort
+    // sort O(m log(m))
     qsort(edges, n_edges, sizeof(edge), edgecmp3);
 
+    // Fill the vertex_idx O(m)
     vertex_idx[0] = 0;
     size_t j = 0;
     for (int i = 0; i < n_edges; i++) {
@@ -138,11 +140,13 @@ edge* Prim(edge* edges, int n_edges, int n_nodes,
     for (int i = j+1; i < n_nodes+1; i++)
         vertex_idx[i] = n_edges;
 
-    //for (int i = 0; i < n_nodes+1; i++)
-    //    printf("%d ", vertex_idx[i]);
-    //putchar('\n');
-
     binheap *q;
+
+    // vector of edges that will be the output as well as the one used
+    // in the priority queue
+    // filled with SIZE_MAX so that the edges are allways smaller than 
+    // any comparison
+    // fixed[i] says if i node is already in the MST
 
     edge* v = (edge*) malloc(sizeof(edge) * n_nodes);
     memset(v , 0xFF, n_nodes * sizeof(edge));
@@ -152,6 +156,7 @@ edge* Prim(edge* edges, int n_edges, int n_nodes,
     int vertex;
 
     q = BINHEAP_INIT(sizeof(edge), v, n_nodes, cmp_func);
+    // inicialyze the queue empty
     BINHEAP_MAKE(q, 0);
 
     for (int j = 0; j < n_nodes; j++){
@@ -162,11 +167,13 @@ edge* Prim(edge* edges, int n_edges, int n_nodes,
         else
             continue;
         while(1) {
-            // update entries in the heap
+            // iterate over the edges of the new node
             for (size_t i = vertex_idx[vertex]; i < vertex_idx[vertex+1]; i++){
-                if (!fixed[edges[i].to] && cmp_func(&edges[i], &v[edges[i].to]) < 0){
+                if (!fixed[edges[i].to] && \
+                    cmp_func(&edges[i], &v[edges[i].to]) < 0){
+                    // update entries in the heap if better edge is found
                     v[edges[i].to] = edges[i];
-                    BINHEAP_UPDATE(q, edges[i].to);
+                    BINHEAP_UPDATE(q, edges[i].to); //same as push
                 }
             }
 
@@ -179,15 +186,12 @@ edge* Prim(edge* edges, int n_edges, int n_nodes,
         }
     }
     
-    // take lowest
-
     *size = n_nodes;
 
     BINHEAP_FREE(q);
     free(vertex_idx);
-    //free(fixed);
+    free(fixed);
     return v;
-
 }
 
 int main(){
