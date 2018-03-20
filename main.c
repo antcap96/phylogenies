@@ -1,34 +1,69 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <limits.h>
+#include <stdint.h>
 #include "binary_heap.h"
 #include "set.h"
 #include "array.h"
 
 typedef struct _edge{
-    int from, to, w;
+    size_t from, to, w;
 } edge;
 
+// sort as aked by the project
 int edgecmp(const void *ap, const void *bp)
 {
     edge a = * (edge *) ap;
     edge b = * (edge *) bp;
 
     if (a.w < b.w)
-            return -1;
+        return -1;
     if (a.w > b.w)
-            return 1;
-    if (a.from < b.from)
-            return -1;
-    if (a.from > b.from)
-            return 1;
-    if (a.to < b.to)
-            return -1;
-    if (a.to > b.to)
-            return 1;
+        return 1;
+
+    size_t atemp = MIN(a.from, a.to);
+    size_t btemp = MIN(b.from, b.to);    
+    if (atemp < btemp)
+        return -1;
+    if (atemp > btemp)
+        return 1;
+    
+    atemp = MAX(a.from, a.to);
+    btemp = MAX(b.from, b.to);
+
+    if (atemp < btemp)
+        return -1;
+    if (atemp > btemp)
+        return 1;
     return 0;
 }
 
+// sort based on index (undirected), treating from and to equaly
 int edgecmp2(const void *ap, const void *bp)
+{
+    edge a = * (edge *) ap;
+    edge b = * (edge *) bp;
+
+    size_t atemp = MIN(a.from, a.to);
+    size_t btemp = MIN(b.from, b.to);    
+    if (atemp < btemp)
+        return -1;
+    if (atemp > btemp)
+        return 1;
+    
+    atemp = MAX(a.from, a.to);
+    btemp = MAX(b.from, b.to);
+
+    if (atemp < btemp)
+        return -1;
+    if (atemp > btemp)
+        return 1;
+    return 0;
+}
+
+// sort based on indexes (directed), from takes precedence to to
+int edgecmp3(const void *ap, const void *bp)
 {
     edge a = * (edge *) ap;
     edge b = * (edge *) bp;
@@ -44,6 +79,7 @@ int edgecmp2(const void *ap, const void *bp)
     return 0;
 }
 
+
 edge* Kruskal(edge* edges, int n_edges, int n_nodes, 
               int (*cmp_func)(const void*, const void*), int*size){
 
@@ -53,9 +89,6 @@ edge* Kruskal(edge* edges, int n_edges, int n_nodes,
     BINHEAP_MAKE(q, n_edges);
 
     set* s = SetInit(n_nodes);
-
-    //for (i = 0; i < n_str; i++)
-    //    SetMake(s, i);
 
     edge* v = (edge*) malloc(sizeof(edge) * n_nodes);
     *size = 0;
@@ -80,38 +113,80 @@ edge* Kruskal(edge* edges, int n_edges, int n_nodes,
     return v;
 }
 
+// the vector output of prim includes some xFF elements that are to be ignored
 edge* Prim(edge* edges, int n_edges, int n_nodes, 
-           int (*cmp_func)(const void*, const void*), int*size){
-    /* Choose first vertex
-     * find lowest weight vertex
-     * Q<-all vertices
-     * F<-empty forest
-     * get vertex v with lowest cost
-     * add v to F and add the edge
-     * go over edges of v
-     * if vw is lower cost than c[w] the update c[w]
-     * return F
-     */
+           int (*cmp_func)(const void*, const void*), int* size){
 
     //mimic adj from sorted edge list
-    //creation is O(|E|)
 
     size_t* vertex_idx;
-    vertex_idx = (size_t*) malloc(n_nodes * sizeof(size_t));
+    vertex_idx = (size_t*) malloc((n_nodes+1) * sizeof(size_t));
 
     //sort
+    qsort(edges, n_edges, sizeof(edge), edgecmp3);
 
     vertex_idx[0] = 0;
-    int j = 0;
+    size_t j = 0;
     for (int i = 0; i < n_edges; i++) {
+        //printf("%d\n", edges[i].from);
         if (edges[i].from == j)
             continue;
         
         for (; j < edges[i].from; j++)
-            vertex_idx[j] = i;
+            vertex_idx[j+1] = i;
     }
+    for (int i = j+1; i < n_nodes+1; i++)
+        vertex_idx[i] = n_edges;
 
-    int vertex = 0;
+    //for (int i = 0; i < n_nodes+1; i++)
+    //    printf("%d ", vertex_idx[i]);
+    //putchar('\n');
+
+    binheap *q;
+
+    edge* v = (edge*) malloc(sizeof(edge) * n_nodes);
+    memset(v , 0xFF, n_nodes * sizeof(edge));
+    signed char* fixed = (signed char*) malloc( sizeof(signed char) * n_nodes);
+    memset(fixed , 0x00, n_nodes * sizeof(signed char));
+
+    int vertex;
+
+    q = BINHEAP_INIT(sizeof(edge), v, n_nodes, cmp_func);
+    BINHEAP_MAKE(q, 0);
+
+    for (int j = 0; j < n_nodes; j++){
+        if (v[j].w == SIZE_MAX) {
+            vertex = j;
+            fixed[j] = 1;
+        }
+        else
+            continue;
+        while(1) {
+            // update entries in the heap
+            for (size_t i = vertex_idx[vertex]; i < vertex_idx[vertex+1]; i++){
+                if (!fixed[edges[i].to] && cmp_func(&edges[i], &v[edges[i].to]) < 0){
+                    v[edges[i].to] = edges[i];
+                    BINHEAP_UPDATE(q, edges[i].to);
+                }
+            }
+
+            if (BINHEAP_EMPTY(q))
+                break;
+
+            vertex = BINHEAP_TOP(q);
+            BINHEAP_POP(q);
+            fixed[vertex] = 1;
+        }
+    }
+    
+    // take lowest
+
+    *size = n_nodes;
+
+    BINHEAP_FREE(q);
+    free(vertex_idx);
+    //free(fixed);
+    return v;
 
 }
 
@@ -157,7 +232,7 @@ int main(){
 
     scanf("%d", &max_dist);
 
-    edges = (edge*) malloc(n_str*(n_str-1)/2* sizeof(edge));
+    edges = (edge*) malloc(n_str*(n_str-1)* sizeof(edge));
 
     for (i = 0; i < n_str; i++){
         for (j = i+1; j < n_str; j++){
@@ -174,9 +249,9 @@ int main(){
                 edges[n_edges].from = i;
                 edges[n_edges].to = j;
                 edges[n_edges++].w = distance;
-                // edges[n_edges].from = j;
-                // edges[n_edges].to = i;
-                // edges[n_edges++].w = distance;
+                edges[n_edges].from = j;
+                edges[n_edges].to = i;
+                edges[n_edges++].w = distance;
             }
         } 
     }
@@ -187,13 +262,20 @@ int main(){
     free(v_str);
 
 
-    edge* v = Kruskal(edges, n_edges, n_str, edgecmp, &i);
+    edge* v = Prim(edges, n_edges, n_str, edgecmp, &i);
+
+    //for (j = 0; j < i; j++) {
+    //    printf("--%lu %lu\n", v[j].from+1,
+    //                        v[j].to+1);
+    //}
 
     qsort(v, i, sizeof(edge), edgecmp2);
 
     for (j = 0; j < i; j++) {
-        printf("%d %d\n", v[j].from+1,
-                          v[j].to+1);
+        if(v[j].from == v[j].to)
+            continue;
+        printf("%lu %lu\n", MIN(v[j].from, v[j].to)+1,
+                            MAX(v[j].to, v[j].from)+1);
     }
 
     free(v);

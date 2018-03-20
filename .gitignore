@@ -1,0 +1,7 @@
+bin
+.vscode
+check*
+in*
+out*
+prog.exe
+graph.txt

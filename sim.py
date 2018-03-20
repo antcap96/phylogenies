@@ -34,6 +34,9 @@ for i in range(size-1):
 
 graph[ graph >= max_diff+1] = 0
 
+with open('graph.txt', 'w') as f:
+    print(graph.astype(int), file=f)
+
 graph = minimum_spanning_tree(graph, overwrite=True)
 
 with open("check2", "w") as f:
