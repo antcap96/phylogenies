@@ -44,6 +44,77 @@ int edgecmp2(const void *ap, const void *bp)
     return 0;
 }
 
+edge* Kruskal(edge* edges, int n_edges, int n_nodes, 
+              int (*cmp_func)(const void*, const void*), int*size){
+
+    binheap *q;
+
+    q = BINHEAP_INIT(sizeof(edge), edges, n_edges, cmp_func);
+    BINHEAP_MAKE(q, n_edges);
+
+    set* s = SetInit(n_nodes);
+
+    //for (i = 0; i < n_str; i++)
+    //    SetMake(s, i);
+
+    edge* v = (edge*) malloc(sizeof(edge) * n_nodes);
+    *size = 0;
+    //printf("--\n");
+    while (! BINHEAP_EMPTY(q)) {
+        edge top = edges[BINHEAP_TOP(q)];
+        if (SetFind(s, top.from) != SetFind(s, top.to)){
+            v[(*size)++] = edges[BINHEAP_TOP(q)];
+            //printf("%d %d\n", edges[BINHEAP_TOP(q)].from+1,
+            //                edges[BINHEAP_TOP(q)].to+1);
+            SetUnion(s, top.from, top.to);
+        }
+        //printf("--%d %d\n", edges[BINHEAP_TOP(q)].from+1,
+        //                    edges[BINHEAP_TOP(q)].to+1);
+
+        BINHEAP_POP(q);
+    }
+
+    BINHEAP_FREE(q);
+    SetFree(s);
+
+    return v;
+}
+
+edge* Prim(edge* edges, int n_edges, int n_nodes, 
+           int (*cmp_func)(const void*, const void*), int*size){
+    /* Choose first vertex
+     * find lowest weight vertex
+     * Q<-all vertices
+     * F<-empty forest
+     * get vertex v with lowest cost
+     * add v to F and add the edge
+     * go over edges of v
+     * if vw is lower cost than c[w] the update c[w]
+     * return F
+     */
+
+    //mimic adj from sorted edge list
+    //creation is O(|E|)
+
+    size_t* vertex_idx;
+    vertex_idx = (size_t*) malloc(n_nodes * sizeof(size_t));
+
+    //sort
+
+    vertex_idx[0] = 0;
+    int j = 0;
+    for (int i = 0; i < n_edges; i++) {
+        if (edges[i].from == j)
+            continue;
+        
+        for (; j < edges[i].from; j++)
+            vertex_idx[j] = i;
+    }
+
+    int vertex = 0;
+
+}
+
 int main(){
 
     int n_str = 0, max_dist = 0, n_edges = 0;
@@ -76,7 +147,7 @@ int main(){
         v_str[i] = (char*) malloc(str_size * sizeof(char));
     }
 
-    for (int i = 1; i < n_str; i++){
+    for (i = 1; i < n_str; i++){
         scanf("%s", v_str[i]);
     }
 
@@ -103,40 +174,20 @@ int main(){
                 edges[n_edges].from = i;
                 edges[n_edges].to = j;
                 edges[n_edges++].w = distance;
+                // edges[n_edges].from = j;
+                // edges[n_edges].to = i;
+                // edges[n_edges++].w = distance;
             }
         } 
     }
 
-    //for (int i = 0; i < n_edges; i++) {
-    //    printf("%d %d %d \n", edges[i].from, edges[i].to, edges[i].w);
-    //}
-
-    binheap *q;
-
-    q = BINHEAP_INIT(sizeof(edge), edges, n_edges, edgecmp);
-    BINHEAP_MAKE(q, n_edges);
-
-    set* s = SetInit(n_str);
-
+    // Free strings
     for (i = 0; i < n_str; i++)
-        SetMake(s, i);
+        free(v_str[i]);
+    free(v_str);
 
-    edge* v = (edge*) malloc(sizeof(edge) * n_str);
-    i = 0;
-    //printf("--\n");
-    while (! BINHEAP_EMPTY(q)) {
-        edge top = edges[BINHEAP_TOP(q)];
-        if (SetFind(s, top.from) != SetFind(s, top.to)){
-            v[i++] = edges[BINHEAP_TOP(q)];
-            //printf("%d %d\n", edges[BINHEAP_TOP(q)].from+1,
-            //                edges[BINHEAP_TOP(q)].to+1);
-            SetUnion(s, top.from, top.to);
-        }
-        //printf("--%d %d\n", edges[BINHEAP_TOP(q)].from+1,
-        //                    edges[BINHEAP_TOP(q)].to+1);
 
-        BINHEAP_POP(q);
-    }
+    edge* v = Kruskal(edges, n_edges, n_str, edgecmp, &i);
 
     qsort(v, i, sizeof(edge), edgecmp2);
 
@@ -145,14 +196,8 @@ int main(){
                           v[j].to+1);
     }
 
-    // free stuff
-    BINHEAP_FREE(q);
     free(v);
     free(edges);
-    for (i = 0; i < n_str; i++)
-        free(v_str[i]);
-    free(v_str);
-    SetFree(s);
 
     return 0;
 }
