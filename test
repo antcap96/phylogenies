@@ -1,6 +1,6 @@
 #!/bin/bash
 
 make -s all
-python sim.py
+python sim.py 1000 70 45
 ./prog.exe < in2 > out2
 diff out2 check2

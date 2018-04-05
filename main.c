@@ -350,7 +350,7 @@ int main(){
     free(v_str);
 
 
-    edge* v = Prim2(edges, n_edges, n_str, edgecmp, &i);
+    edge* v = Prim(edges, n_edges, n_str, edgecmp, &i);
 
     //for (j = 0; j < i; j++) {
     //    printf("--%lu %lu\n", v[j].from+1,

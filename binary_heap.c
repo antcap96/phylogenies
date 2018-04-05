@@ -20,7 +20,7 @@ size_t RIGHT(size_t x) {
 
 size_t PARENT(size_t x) {
     if (x != 0)
-        return x / 2;
+        return (x - 1) / 2;
     else
         return SIZE_MAX;
 }
