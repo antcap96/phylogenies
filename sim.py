@@ -8,7 +8,7 @@ import numpy as np
 from scipy.sparse.csgraph import minimum_spanning_tree
 import sys
 
-size = 100
+size = 1000
 str_size = 70
 max_diff = 25
 

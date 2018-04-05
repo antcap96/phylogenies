@@ -298,58 +298,15 @@ void RRHeapActiveSiblingTransform(RRHeap* h, group* a, group* s)
     RRHeapPromote(h, c);
 }
 
-void RRHeapGoodSiblingTransform(RRHeap* h, group* a, group* s){
-    size_t r = a->rank;
-    group* pa = a->parent;
-    group* ga = pa->parent;
-    group* c = s->children[s->rank-1];
-    assert(c->rank == r);
-    if (h->A[r] == c) {
-        RRHeapPairTransform(h, a);
-    } else {
-        group* p = a->parent;
-        s->children[r] = a;
-        a->parent = s;
-        p->children[r] = c;
-        c->parent = p;
-
-        RRHeapPromote(h, a);
-        //RRHeapClean(h, pa);
-    }
-    RRHeapPromote(h, a);
-}
-
-//very diferent from paper, wtf?
-// void RRHeapGoodSiblingTransform(RRHeap* h, group* a, group* s)
-// {
+// void RRHeapGoodSiblingTransform(RRHeap* h, group* a, group* s){
 //     size_t r = a->rank;
+//     group* pa = a->parent;
+//     group* ga = pa->parent;
 //     group* c = s->children[s->rank-1];
 //     assert(c->rank == r);
 //     if (h->A[r] == c) {
-//         h->A[r] = NULL;
-//         group* p = a->parent;
-
-//         // Remove c from its parent
-//         --s->rank;
-
-//         // Make s the rank r child of p
-//         s->parent = p;
-//         p->children[r] = s;
-
-//         // combine a, c and let the result by the rank r+1 child of p
-//         assert(p->rank > r+1);
-//         group* x = RRHeapCombine(h, a, c);
-//         x->parent = p;
-//         p->children[r+1] = x;
-
-//         if (h->A[r+1] == s)
-//             h->A[r+1] = x;
-//         else
-//             RRHeapPromote(h, x);
-
-//       //      pair_transform(a);
+//         RRHeapPairTransform(h, a);
 //     } else {
-//         // Clean operation
 //         group* p = a->parent;
 //         s->children[r] = a;
 //         a->parent = s;
@@ -357,8 +314,53 @@ void RRHeapGoodSiblingTransform(RRHeap* h, group* a, group* s){
 //         c->parent = p;
 
 //         RRHeapPromote(h, a);
+//         //RRHeapClean(h, pa);
 //     }
+//     RRHeapPromote(h, a);
 // }
+
+//very diferent from paper, wtf?
+void RRHeapGoodSiblingTransform(RRHeap* h, group* a, group* s)
+{
+    size_t r = a->rank;
+    group* c = s->children[s->rank-1];
+    assert(c->rank == r);
+    if (h->A[r] == c) {
+        h->A[r] = NULL;
+        group* p = a->parent;
+
+        // Remove c from its parent
+        --s->rank;
+
+        // Make s the rank r child of p
+        s->parent = p;
+        p->children[r] = s;
+
+        // combine a, c and let the result be the rank r+1 child of p
+        assert(p->rank > r+1);
+        group* x = RRHeapCombine(h, a, c);
+        x->parent = p;
+        p->children[r+1] = x;
+
+        // this part is very confusion
+        // s should not be active garantied by the caller, right?
+        if (h->A[r+1] == s)
+            h->A[r+1] = x;
+        else
+            RRHeapPromote(h, x);
+
+      //      pair_transform(a);
+    } else {
+        // Clean operation
+        group* p = a->parent;
+        s->children[r] = a;
+        a->parent = s;
+        p->children[r] = c;
+        c->parent = p;
+
+        RRHeapPromote(h, a);
+    }
+}
 
 
 // ok
