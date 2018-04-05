@@ -16,15 +16,18 @@ typedef struct _RRHeap{
     int (*cmp)(const void*, const void*);
     //size_t map;
     size_t key_size;
-    size_t size;
+    //size_t size;
+    size_t max_size;
     group root;
     group* index_to_group;
     group** A;
     size_t A_size;
     void * key;
+    // information on whether id is in heap or not
+    int* in;
 } RRHeap;
 
-RRHeap* RRHeapMake(size_t type_size, size_t max_size, void* data,
+RRHeap* RRHeapMake(size_t type_size, void* data, size_t max_size,
                    int (*cmp_func)(const void*, const void*));
 
 void RRHeapFree(RRHeap* h);
@@ -40,6 +43,9 @@ void RRHeapActiveSiblingTransform(RRHeap* h,group* a, group* s);
 void RRHeapFindSmallest(RRHeap* h);
 group* RRHeapCombine(RRHeap* h, group* a1, group* a2);
 void RRHeapClean(RRHeap*h, group* q);
+void RRHeapPop(RRHeap* h);
+size_t RRHeapTop(RRHeap *h);
+int RRHeapTopEmpty(RRHeap *h);
 
 //other
 size_t log_base_2(size_t n);

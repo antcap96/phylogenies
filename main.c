@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include "binary_heap.h"
+#include "rank_relaxed_heap.h"
 #include "set.h"
 #include "array.h"
 
@@ -189,6 +190,89 @@ edge* Prim(edge* edges, int n_edges, int n_nodes,
     *size = n_nodes;
 
     BINHEAP_FREE(q);
+    free(vertex_idx);
+    free(fixed);
+    return v;
+}
+
+// the vector output of prim includes some xFF elements that are to be ignored
+edge* Prim2(edge* edges, int n_edges, int n_nodes, 
+            int (*cmp_func)(const void*, const void*), int* size){
+    
+    // vector of idx to mimic adj matrix
+    // vertex_idx[i] will be the index of the begining of edges from i
+    // vertex_idx[i+1] will be the index after the end
+
+    // O(n)
+    size_t* vertex_idx;
+    vertex_idx = (size_t*) malloc((n_nodes+1) * sizeof(size_t));
+
+    // sort O(m log(m))
+    qsort(edges, n_edges, sizeof(edge), edgecmp3);
+
+    // Fill the vertex_idx O(m)
+    vertex_idx[0] = 0;
+    size_t j = 0;
+    for (int i = 0; i < n_edges; i++) {
+        //printf("%d\n", edges[i].from);
+        if (edges[i].from == j)
+            continue;
+        
+        for (; j < edges[i].from; j++)
+            vertex_idx[j+1] = i;
+    }
+    for (int i = j+1; i < n_nodes+1; i++)
+        vertex_idx[i] = n_edges;
+
+    RRHeap *q;
+
+    // vector of edges that will be the output as well as the one used
+    // in the priority queue
+    // filled with SIZE_MAX so that the edges are allways smaller than 
+    // any comparison
+    // fixed[i] says if i node is already in the MST
+
+    edge* v = (edge*) malloc(sizeof(edge) * n_nodes);
+    memset(v , 0xFF, n_nodes * sizeof(edge));
+    signed char* fixed = (signed char*) malloc( sizeof(signed char) * n_nodes);
+    memset(fixed , 0x00, n_nodes * sizeof(signed char));
+
+    int vertex;
+
+    q = RRHeapMake(sizeof(edge), v, n_nodes, cmp_func);
+    // inicialyze the queue empty
+    //BINHEAP_MAKE(q, 0);
+
+    for (int j = 0; j < n_nodes; j++){
+        if (v[j].w == SIZE_MAX) {
+            vertex = j;
+            fixed[j] = 1;
+        }
+        else
+            continue;
+        while(1) {
+            // iterate over the edges of the new node
+            for (size_t i = vertex_idx[vertex]; i < vertex_idx[vertex+1]; i++){
+                if (!fixed[edges[i].to] && \
+                    cmp_func(&edges[i], &v[edges[i].to]) < 0){
+                    // update entries in the heap if better edge is found
+                    v[edges[i].to] = edges[i];
+                    RRHeapInsert(q, edges[i].to); //same as push
+                }
+            }
+
+            if (RRHeapTopEmpty(q))
+                break;
+
+            vertex = RRHeapTop(q);
+            RRHeapPop(q);
+            fixed[vertex] = 1;
+        }
+    }
+    
+    *size = n_nodes;
+
+    RRHeapFree(q);
     free(vertex_idx);
     free(fixed);
     return v;

@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <assert.h>
 
+// gives position of largest bit = 1
+// copied from boost c++, is it ok?
 size_t log_base_2(size_t n)
 {
     size_t leading_zeroes = 0;
@@ -19,14 +21,15 @@ size_t log_base_2(size_t n)
     return sizeof(size_t) * CHAR_BIT - leading_zeroes - 1;
 }
 
-RRHeap* RRHeapMake(size_t type_size, size_t max_size, void* data,
+// attention: max_size = 0 might be a problem
+RRHeap* RRHeapMake(size_t type_size, void* data, size_t max_size,
                    int (*cmp_func)(const void*, const void*)) {
     
     RRHeap* h = (RRHeap*) malloc(sizeof(RRHeap));
 
     h->key_size = type_size;
     h->key = data;
-
+    h->max_size = max_size;
     h->smallest_value = NULL;
     h->cmp = cmp_func;
     h->log_n = log_base_2(max_size);
@@ -38,23 +41,27 @@ RRHeap* RRHeapMake(size_t type_size, size_t max_size, void* data,
     size_t log_g = log_base_2(g);
     size_t r = log_g;
 
+    h->in = (int*) malloc( sizeof(int) * max_size);
+    memset(h->in, 0, sizeof(int) * max_size);
+
     // this is where I allocate the space for the groups
     h->index_to_group = (group*) malloc( sizeof(group) * g);
 
     for(size_t i = 0; i < g; i++) {
         h->index_to_group[i].value = SIZE_MAX;
-        // they are their own parent for some reason
+        // TODO: they are their own parent for some reason
         h->index_to_group[i].parent = &h->index_to_group[i];
-        // all largest key for reasons i don't get yet
+        // largest_key means that they the group is empty
+        // i could use SIZE_MAX for value, should work as well
         h->index_to_group[i].kind = largest_key;
     }
 
 
     h->A = (group**) malloc(sizeof(group*) * (r+1));
-    h->A_size = r+1;
     memset(h->A, 0, sizeof(group*) * (r+1));
     h->root.rank = r+1;
     h->root.parent = NULL;
+    h->root.kind = smallest_key;
 
     // dont get the (log_g + 1) * (g + 1)
     // yes I do: max_rank * num_groups
@@ -94,6 +101,7 @@ size_t build_tree(RRHeap* h,  group* parent, size_t idx,
 }
 
 void RRHeapFree(RRHeap* h){
+    free(h->in);
     free(h->A);
     free(h->index_to_group);
     free(h->root.children);
@@ -101,15 +109,17 @@ void RRHeapFree(RRHeap* h){
 }
 
 void RRHeapInsert(RRHeap* h, size_t id){
+    h->in[id] = 1;
     RRHeapUpdate(h, id);
 }
 
 void RRHeapUpdate(RRHeap* h, size_t id) {
     group* a = &h->index_to_group[id / h->log_n];
     if (a->value == SIZE_MAX
-        || a->value == id
-        || h->cmp(h->key + h->key_size * id, 
-                  h->key + h->key_size * a->value) < 0) {
+            || a->kind == largest_key // not
+            || a->value == id
+            || h->cmp(h->key + h->key_size * id, 
+                      h->key + h->key_size * a->value) < 0) {
         
         // stuff
         if (a != h->smallest_value)
@@ -121,22 +131,27 @@ void RRHeapUpdate(RRHeap* h, size_t id) {
 }
 
 void RRHeapPromote(RRHeap* h, group* a) {
-    assert(a != 0);
+    assert(a != NULL);
     size_t r = a->rank;
     group* p = a->parent;
-    assert(p != 0);
-    if (RRHeapGroupCompare(h, a, p) < 0) {
+    assert(p != NULL);
+    
+    if (!(RRHeapGroupCompare(h, a, p) < 0)){
+        if(h->A[r] == a)
+            h->A[r] = NULL;
+    }
+    else {
         // s is the rank + 1 sibling
-        group* s = p->rank > r + 1? p->children[r + 1] : 0;
+        group* s = p->rank > r + 1? p->children[r + 1] : NULL;
 
         // If a is the last child of p
         if (r == p->rank - 1) {
-            if (!h->A[r])
+            if (h->A[r] == NULL)
                 h->A[r] = a;
             else if (h->A[r] != a)
                 RRHeapPairTransform(h, a);
         } else {
-            assert(s != 0);
+            assert(s != NULL);
             if (h->A[r + 1] == s)
                 RRHeapActiveSiblingTransform(h, a, s);
             else
@@ -145,7 +160,7 @@ void RRHeapPromote(RRHeap* h, group* a) {
     }
 }
 
-// I have to change this compartion function!
+// I don't have to change this compartion function!
 int RRHeapGroupCompare(RRHeap* h, group* x, group* y)
 {
     if (x->kind < y->kind
@@ -154,8 +169,14 @@ int RRHeapGroupCompare(RRHeap* h, group* x, group* y)
             && h->cmp(h->key + h->key_size * x->value, 
                       h->key + h->key_size * y->value) < 0))
         return -1;
-    else
+    else if (x->kind > y->kind
+        || (x->kind == y->kind
+            && x->kind == stored_key
+            && h->cmp(h->key + h->key_size * x->value, 
+                      h->key + h->key_size * y->value) > 0))
         return 1;
+    
+    return 0;
 }
 
 void RRHeapFindSmallest(RRHeap* h) {
@@ -170,10 +191,11 @@ void RRHeapFindSmallest(RRHeap* h) {
                 h->smallest_value = roots[i];
             }
         }
-        for (i = 0; i < h->A_size; ++i) {
-            if (h->A[i] && (h->smallest_value == NULL 
-                    || RRHeapGroupCompare(h, h->A[i], h->smallest_value) < 0))
+        for (i = 0; i < h->root.rank; ++i) {
+            if (h->A[i] != NULL && (h->smallest_value == NULL 
+                    || RRHeapGroupCompare(h, h->A[i], h->smallest_value) < 0)){
                 h->smallest_value = h->A[i];
+            }
         }
     }
 }
@@ -186,34 +208,29 @@ static void do_swap(group** x, group** y)
 }
 
 // somewhat diferent from book, try to understand how
+// ok
 void RRHeapPairTransform(RRHeap* h, group* a) {
     size_t r = a->rank;
 
-    // p is a's parent
     group* pa = a->parent;
     assert(pa != NULL);
 
-    // g is p's parent (a's grandparent)
     group* ga = pa->parent;
     assert(ga != NULL);
 
-    // a' <- A(r)
     assert(h->A[r] != NULL);
     group* b = h->A[r];
     assert(b != NULL);
 
-    // A(r) <- nil
     h->A[r] = NULL;
 
-    // let a' have parent p'
     group* pb = b->parent;
-    assert(pb != 0);
+    assert(pb != NULL);
 
-    // let a' have grandparent g'
     group* gb = pb->parent;
-    assert(gb != 0);
+    assert(gb != NULL);
 
-    // Remove a and a' from their parents
+    // Remove a and b from their parents
     assert(b == pb->children[pb->rank-1]); // Guaranteed because ap is active
     --pb->rank;
 
@@ -221,32 +238,37 @@ void RRHeapPairTransform(RRHeap* h, group* a) {
     assert(a == pa->children[pa->rank-1]);
     --pa->rank;
 
-    // Note: a, ap, p, pp all have rank r
+    // Note: a, pa, b, pb all have rank r
     if (RRHeapGroupCompare(h, pb, pa) < 0) {
         do_swap(&a, &b);
         do_swap(&pa, &pb);
         do_swap(&ga, &gb);
     }
 
-    // Assuming k(p) <= k(p')
-    // make p' the rank r child of p
+    // Assuming k(pa) <= k(pb)
+    // make pb the rank r child of pa
     assert(r == pa->rank);
     pa->children[pa->rank++] = pb;
     pb->parent = pa;
 
-    // Combine a, ap into a rank r+1 group c
+    // Combine a, b into a rank r+1 group c
     group* c = RRHeapCombine(h, a, b);
 
-    // make c the rank r+1 child of g'
+    // make c the rank r+1 child of gb
     assert(gb->rank > r+1);
     gb->children[r+1] = c;
     c->parent = gb;
 
     if (h->A[r+1] == pb)
-        h->A[r+1] = c;
-    else RRHeapPromote(h, c);
+        if (RRHeapGroupCompare(h, c, gb) < 0)
+            h->A[r+1] = c;
+        else
+            h->A[r+1] = NULL;
+    else
+        RRHeapPromote(h, c);
 }
 
+// understand what this is
 void RRHeapActiveSiblingTransform(RRHeap* h, group* a, group* s)
 {
     group* p = a->parent;
@@ -268,45 +290,23 @@ void RRHeapActiveSiblingTransform(RRHeap* h, group* a, group* s)
     assert(g->children[r+2] == p);
     g->children[r+2] = c;
     c->parent = g;
+    
     // this part is different from paper
     if (h->A[r+2] == p)
-        h->A[r+2] = c;
-    else
-        RRHeapPromote(h, c);
+        h->A[r+2] = NULL;
+    
+    RRHeapPromote(h, c);
 }
 
-
-// very diferent from paper, wtf?
-void RRHeapGoodSiblingTransform(RRHeap* h, group* a, group* s)
-{
+void RRHeapGoodSiblingTransform(RRHeap* h, group* a, group* s){
     size_t r = a->rank;
+    group* pa = a->parent;
+    group* ga = pa->parent;
     group* c = s->children[s->rank-1];
     assert(c->rank == r);
     if (h->A[r] == c) {
-        h->A[r] = NULL;
-        group* p = a->parent;
-
-        // Remove c from its parent
-        --s->rank;
-
-        // Make s the rank r child of p
-        s->parent = p;
-        p->children[r] = s;
-
-        // combine a, c and let the result by the rank r+1 child of p
-        assert(p->rank > r+1);
-        group* x = RRHeapCombine(h, a, c);
-        x->parent = p;
-        p->children[r+1] = x;
-
-        if (h->A[r+1] == s)
-            h->A[r+1] = x;
-        else
-            RRHeapPromote(h, x);
-
-      //      pair_transform(a);
+        RRHeapPairTransform(h, a);
     } else {
-        // Clean operation
         group* p = a->parent;
         s->children[r] = a;
         a->parent = s;
@@ -314,21 +314,66 @@ void RRHeapGoodSiblingTransform(RRHeap* h, group* a, group* s)
         c->parent = p;
 
         RRHeapPromote(h, a);
+        //RRHeapClean(h, pa);
     }
+    RRHeapPromote(h, a);
 }
 
+//very diferent from paper, wtf?
+// void RRHeapGoodSiblingTransform(RRHeap* h, group* a, group* s)
+// {
+//     size_t r = a->rank;
+//     group* c = s->children[s->rank-1];
+//     assert(c->rank == r);
+//     if (h->A[r] == c) {
+//         h->A[r] = NULL;
+//         group* p = a->parent;
 
-group* RRHeapCombine(RRHeap* h, group* a1, group* a2)
+//         // Remove c from its parent
+//         --s->rank;
+
+//         // Make s the rank r child of p
+//         s->parent = p;
+//         p->children[r] = s;
+
+//         // combine a, c and let the result by the rank r+1 child of p
+//         assert(p->rank > r+1);
+//         group* x = RRHeapCombine(h, a, c);
+//         x->parent = p;
+//         p->children[r+1] = x;
+
+//         if (h->A[r+1] == s)
+//             h->A[r+1] = x;
+//         else
+//             RRHeapPromote(h, x);
+
+//       //      pair_transform(a);
+//     } else {
+//         // Clean operation
+//         group* p = a->parent;
+//         s->children[r] = a;
+//         a->parent = s;
+//         p->children[r] = c;
+//         c->parent = p;
+
+//         RRHeapPromote(h, a);
+//     }
+// }
+
+
+// ok
+group* RRHeapCombine(RRHeap* h, group* a, group* b)
 {
-    assert(a1->rank == a2->rank);
-    if (RRHeapGroupCompare(h, a2, a1) < 0)
-        do_swap(&a1, &a2);
-    a1->children[a1->rank++] = a2;
-    a2->parent = a1;
-    RRHeapClean(h, a1);
-    return a1;
+    assert(a->rank == b->rank);
+    if (RRHeapGroupCompare(h, b, a) < 0)
+        do_swap(&a, &b);
+    a->children[a->rank++] = b;
+    b->parent = a;
+    RRHeapClean(h, a);
+    return a;
 }
 
+// ok
 void RRHeapClean(RRHeap*h, group* q)
 {
     if (q->rank < 2)
@@ -353,6 +398,7 @@ void RRHeapClean(RRHeap*h, group* q)
 void RRHeapRemove(RRHeap* h, size_t id)
 {
     group* a = &h->index_to_group[id / h->log_n];
+    assert(h->in[id]);
     a->value = id;
     a->kind = smallest_key;
     RRHeapPromote(h, a);
@@ -362,28 +408,23 @@ void RRHeapRemove(RRHeap* h, size_t id)
 
 size_t RRHeapTop(RRHeap *h)
 {
-    find_smallest();
+    RRHeapFindSmallest(h);
     return h->smallest_value->value;
 }
 
 int RRHeapTopEmpty(RRHeap *h)
 {
-    find_smallest();
-    // don't actually know what this means
+    RRHeapFindSmallest(h);
+    // both mean the same thing, is there a casa in which one is true \
+    and the other is not?
     return h->smallest_value->value == SIZE_MAX 
         || (h->smallest_value->kind == largest_key);
 }
 
-  //bool contains(const value_type& x) const {
-  //  return static_cast<bool>(groups[get(id, x)]);
-  //}
-
-
-// TODO: THIS FUNCTION IS NOT YET DONE
 void RRHeapPop(RRHeap* h)
 {
     // Fill in smallest_value. This is the group x.
-    find_smallest();
+    RRHeapFindSmallest(h);
     group* x = h->smallest_value;
     h->smallest_value = NULL;
 
@@ -394,20 +435,23 @@ void RRHeapPop(RRHeap* h)
     assert(x->value != SIZE_MAX);
 
     // Find x's group
-    size_t start = get(id, *x->value) - get(id, *x->value) % log_n;
-    size_t end = start + log_n;
-    if (end > groups.size())
-        end = groups.size();
+    size_t start = x->value - (x->value % h->log_n);
+    size_t end = start + h->log_n;
+    if (end > h->max_size)
+        end = h->max_size;
 
     // Remove the smallest value from the group, and find the new
     // smallest value.
-    groups[get(id, *x->value)].reset();
-    x->value.reset();
+    //groups[get(id, *x->value)].reset();
+    h->in[x->value] = 0;
+    x->value = SIZE_MAX;
     x->kind = largest_key;
     for (size_t i = start; i < end; ++i) {
-        if (groups[i] && (x->value != SIZE_MAX || compare(*groups[i], *x->value))) {
+        if (h->in[i] && (x->value == SIZE_MAX || 
+            h->cmp(h->key + h->key_size * i, 
+                   h->key + h->key_size * x->value) < 0)) {
             x->kind = stored_key;
-            x->value = groups[i];
+            x->value = i;
         }
     }
 
@@ -415,11 +459,11 @@ void RRHeapPop(RRHeap* h)
 
     // Combine prior children of x with x
     group* y = x;
-    for (size_type c = 0; c < r; ++c) {
+    for (size_t c = 0; c < r; ++c) {
         group* child = x->children[c];
-        if (A[c] == child)
-            A[c] = 0;
-        y = combine(y, child);
+        if (h->A[c] == child)
+            h->A[c] = NULL;
+        y = RRHeapCombine(h, y, child);
     }
 
     // If we got back something other than x, let y take x's place
@@ -428,7 +472,7 @@ void RRHeapPop(RRHeap* h)
         p->children[r] = y;
 
         assert(r == y->rank);
-        if (A[y->rank] == x)
-            A[y->rank] = do_compare(y, p)? y : 0;
+        if (h->A[y->rank] == x)
+            h->A[y->rank] = (RRHeapGroupCompare(h, y, p) < 0)? y : NULL;
     }
 }

@@ -26,6 +26,8 @@ with open("in2", "w") as f:
         print(*data[i], sep='', file=f)
     print(max_diff, file=f)
 
+print("done creating")
+
 graph = np.zeros((size, size))
 
 for i in range(size-1):
