@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <assert.h>
 
+static size_t build_tree(RRHeap* h, group* root, size_t idx,
+                         size_t r, size_t max_rank);
+
 // gives position of largest bit = 1
 // copied from boost c++, is it ok?
 size_t log_base_2(size_t n)
@@ -25,6 +28,8 @@ size_t log_base_2(size_t n)
 RRHeap* RRHeapMake(size_t type_size, void* data, size_t max_size,
                    int (*cmp_func)(const void*, const void*)) {
     
+    assert(max_size != 0);
+
     RRHeap* h = (RRHeap*) malloc(sizeof(RRHeap));
 
     h->key_size = type_size;
@@ -63,8 +68,7 @@ RRHeap* RRHeapMake(size_t type_size, void* data, size_t max_size,
     h->root.parent = NULL;
     h->root.kind = smallest_key;
 
-    // dont get the (log_g + 1) * (g + 1)
-    // yes I do: max_rank * num_groups
+    // yes I do: max_rank * (num_groups + root)
     h->root.children = (group**) malloc(sizeof(group*) * (log_g+1) * (g+1));
     
     // set the B-trees to NULL, fill only the necessary ones
@@ -82,8 +86,11 @@ RRHeap* RRHeapMake(size_t type_size, void* data, size_t max_size,
     return h;
 }
 
-size_t build_tree(RRHeap* h,  group* parent, size_t idx,
-                  size_t r,  size_t max_rank){
+
+// internal function
+// max_rank is always log_g + 1
+static size_t build_tree(RRHeap* h,  group* parent, size_t idx,
+                         size_t r,  size_t max_rank){
     
     group* this_group = &h->index_to_group[idx];
     this_group->parent = parent;
@@ -141,9 +148,6 @@ void RRHeapPromote(RRHeap* h, group* a) {
             h->A[r] = NULL;
     }
     else {
-        // s is the rank + 1 sibling
-        group* s = p->rank > r + 1? p->children[r + 1] : NULL;
-
         // If a is the last child of p
         if (r == p->rank - 1) {
             if (h->A[r] == NULL)
@@ -151,7 +155,9 @@ void RRHeapPromote(RRHeap* h, group* a) {
             else if (h->A[r] != a)
                 RRHeapPairTransform(h, a);
         } else {
-            assert(s != NULL);
+            // s is the rank + 1 sibling
+            group* s = p->children[r + 1];
+            
             if (h->A[r + 1] == s)
                 RRHeapActiveSiblingTransform(h, a, s);
             else
@@ -160,7 +166,7 @@ void RRHeapPromote(RRHeap* h, group* a) {
     }
 }
 
-// I don't have to change this compartion function!
+// compare two groups, output 1 if x > y, -1 if x < y, 0 if equal
 int RRHeapGroupCompare(RRHeap* h, group* x, group* y)
 {
     if (x->kind < y->kind
@@ -179,6 +185,9 @@ int RRHeapGroupCompare(RRHeap* h, group* x, group* y)
     return 0;
 }
 
+// internal funtion that sets h->smallest_value if not set
+// looks though children of root and active nodes
+// O(log_g)
 void RRHeapFindSmallest(RRHeap* h) {
     group** roots = h->root.children;
 
@@ -200,7 +209,7 @@ void RRHeapFindSmallest(RRHeap* h) {
     }
 }
 
-static void do_swap(group** x, group** y)
+static void swap_groups(group** x, group** y)
 {
     group* tmp = *x;
     *x = *y;
@@ -240,9 +249,9 @@ void RRHeapPairTransform(RRHeap* h, group* a) {
 
     // Note: a, pa, b, pb all have rank r
     if (RRHeapGroupCompare(h, pb, pa) < 0) {
-        do_swap(&a, &b);
-        do_swap(&pa, &pb);
-        do_swap(&ga, &gb);
+        swap_groups(&a, &b);
+        swap_groups(&pa, &pb);
+        swap_groups(&ga, &gb);
     }
 
     // Assuming k(pa) <= k(pb)
@@ -368,7 +377,7 @@ group* RRHeapCombine(RRHeap* h, group* a, group* b)
 {
     assert(a->rank == b->rank);
     if (RRHeapGroupCompare(h, b, a) < 0)
-        do_swap(&a, &b);
+        swap_groups(&a, &b);
     a->children[a->rank++] = b;
     b->parent = a;
     RRHeapClean(h, a);
@@ -417,8 +426,8 @@ size_t RRHeapTop(RRHeap *h)
 int RRHeapTopEmpty(RRHeap *h)
 {
     RRHeapFindSmallest(h);
-    // both mean the same thing, is there a casa in which one is true \
-    and the other is not?
+    // both mean the same thing, is there a casa in which one is true 
+    // and the other is not?
     return h->smallest_value->value == SIZE_MAX 
         || (h->smallest_value->kind == largest_key);
 }
