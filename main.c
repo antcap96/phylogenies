@@ -41,7 +41,7 @@ int edgecmp(const void *ap, const void *bp)
 }
 
 // sort based on index (undirected), treating from and to equaly
-int edgecmp2(const void *ap, const void *bp)
+int undirectedcmp(const void *ap, const void *bp)
 {
     edge a = * (edge *) ap;
     edge b = * (edge *) bp;
@@ -64,7 +64,7 @@ int edgecmp2(const void *ap, const void *bp)
 }
 
 // sort based on indexes (directed), from takes precedence to to
-int edgecmp3(const void *ap, const void *bp)
+int directedcmp(const void *ap, const void *bp)
 {
     edge a = * (edge *) ap;
     edge b = * (edge *) bp;
@@ -82,7 +82,7 @@ int edgecmp3(const void *ap, const void *bp)
 
 
 edge* Kruskal(edge* edges, int n_edges, int n_nodes, 
-              int (*cmp_func)(const void*, const void*), int*size){
+              int (*cmp_func)(const void*, const void*), int* size) {
 
     // create the queue
     binheap *q;
@@ -125,7 +125,7 @@ edge* Prim(edge* edges, int n_edges, int n_nodes,
     vertex_idx = (size_t*) malloc((n_nodes+1) * sizeof(size_t));
 
     // sort O(m log(m))
-    qsort(edges, n_edges, sizeof(edge), edgecmp3);
+    qsort(edges, n_edges, sizeof(edge), directedcmp);
 
     // Fill the vertex_idx O(m)
     vertex_idx[0] = 0;
@@ -208,7 +208,7 @@ edge* Prim2(edge* edges, int n_edges, int n_nodes,
     vertex_idx = (size_t*) malloc((n_nodes+1) * sizeof(size_t));
 
     // sort O(m log(m))
-    qsort(edges, n_edges, sizeof(edge), edgecmp3);
+    qsort(edges, n_edges, sizeof(edge), directedcmp);
 
     // Fill the vertex_idx O(m)
     vertex_idx[0] = 0;
@@ -241,7 +241,6 @@ edge* Prim2(edge* edges, int n_edges, int n_nodes,
 
     q = RRHeapMake(sizeof(edge), v, n_nodes, cmp_func);
     // inicialyze the queue empty
-    //BINHEAP_MAKE(q, 0);
 
     for (int j = 0; j < n_nodes; j++){
         if (v[j].w == SIZE_MAX) {
@@ -314,10 +313,6 @@ int main(){
         scanf("%s", v_str[i]);
     }
 
-    //for (int i = 0; i < n_str; i++){
-    //    printf("%s\n", v_str[i]);
-    //}
-
     scanf("%d", &max_dist);
 
     edges = (edge*) malloc(n_str*(n_str-1)* sizeof(edge));
@@ -352,12 +347,7 @@ int main(){
 
     edge* v = Prim2(edges, n_edges, n_str, edgecmp, &i);
 
-    //for (j = 0; j < i; j++) {
-    //    printf("--%lu %lu\n", v[j].from+1,
-    //                        v[j].to+1);
-    //}
-
-    qsort(v, i, sizeof(edge), edgecmp2);
+    qsort(v, i, sizeof(edge), undirectedcmp);
 
     for (j = 0; j < i; j++) {
         if(v[j].from == v[j].to)

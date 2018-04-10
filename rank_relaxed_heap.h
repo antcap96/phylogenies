@@ -11,19 +11,26 @@ typedef struct _group{
 } group;
 
 typedef struct _RRHeap{
+    // pointer to the groups with the lowest value
     group* smallest_value;
+    // log of max_size, used to get group idx from value
     size_t log_n;
+    // function used to compare 2 groups
     int (*cmp)(const void*, const void*);
-    //size_t map;
+    // size of each element
     size_t key_size;
-    //size_t size;
+
     size_t max_size;
+    // root of the tree. Doesn't hold any elements
     group root;
+    // vector with data of the heap
     group* index_to_group;
+    // vector with pointers to active nodes
     group** A;
-    //size_t A_size;
+    // vector with actual data
     void * key;
     // information on whether id is in heap or not
+    // TODO: make this a bitset maybe
     int* in;
 } RRHeap;
 
@@ -33,14 +40,6 @@ RRHeap* RRHeapMake(size_t type_size, void* data, size_t max_size,
 void RRHeapFree(RRHeap* h);
 void RRHeapInsert(RRHeap* h, size_t id);
 void RRHeapUpdate(RRHeap* h, size_t id);
-int RRHeapGroupCompare(RRHeap* h, group* x, group* y);
-void RRHeapPromote(RRHeap* h, group* a);
-void RRHeapPairTransform(RRHeap* h,group* a);
-void RRHeapGoodSiblingTransform(RRHeap* h,group* a, group* s);
-void RRHeapActiveSiblingTransform(RRHeap* h,group* a, group* s);
-void RRHeapFindSmallest(RRHeap* h);
-group* RRHeapCombine(RRHeap* h, group* a1, group* a2);
-void RRHeapClean(RRHeap*h, group* q);
 void RRHeapPop(RRHeap* h);
 size_t RRHeapTop(RRHeap *h);
 int RRHeapTopEmpty(RRHeap *h);
