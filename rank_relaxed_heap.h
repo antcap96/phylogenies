@@ -1,13 +1,18 @@
 #include <stdlib.h>
+#include <limits.h>
 
-enum group_key_kind { smallest_key, stored_key, largest_key };
+#define BITMASK(b) (1 << ((b) % CHAR_BIT))
+#define BITSLOT(b) ((b) / CHAR_BIT)
+#define BITSET(a, b) ((a)[BITSLOT(b)] |= BITMASK(b))
+#define BITCLEAR(a, b) ((a)[BITSLOT(b)] &= ~BITMASK(b))
+#define BITTEST(a, b) ((a)[BITSLOT(b)] & BITMASK(b))
+#define BITNSLOTS(nb) ((nb + CHAR_BIT - 1) / CHAR_BIT)
 
 typedef struct _group{
     struct _group* parent;
     size_t rank;
     struct _group** children;
     size_t value;
-    enum group_key_kind kind;
 } group;
 
 typedef struct _RRHeap{
@@ -30,8 +35,8 @@ typedef struct _RRHeap{
     // vector with actual data
     void * key;
     // information on whether id is in heap or not
-    // TODO: make this a bitset maybe
-    int* in;
+    // used as a bitset
+    char* in;
 } RRHeap;
 
 RRHeap* RRHeapMake(size_t type_size, void* data, size_t max_size,

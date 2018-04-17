@@ -40,7 +40,7 @@ int edgecmp(const void *ap, const void *bp)
     return 0;
 }
 
-// sort based on index (undirected), treating from and to equaly
+// sort based on index (undirected), treating 'from' and 'to' equaly
 int undirectedcmp(const void *ap, const void *bp)
 {
     edge a = * (edge *) ap;
@@ -63,7 +63,7 @@ int undirectedcmp(const void *ap, const void *bp)
     return 0;
 }
 
-// sort based on indexes (directed), from takes precedence to to
+// sort based on indexes (directed), 'from' takes precedence to 'to'
 int directedcmp(const void *ap, const void *bp)
 {
     edge a = * (edge *) ap;
@@ -107,6 +107,32 @@ edge* Kruskal(edge* edges, int n_edges, int n_nodes,
     }
 
     BINHEAP_FREE(q);
+    SetFree(s);
+
+    return v;
+}
+
+edge* Kruskal2(edge* edges, int n_edges, int n_nodes, 
+               int (*cmp_func)(const void*, const void*), int* size) {
+    
+    
+    // sort edges
+    qsort(edges, n_edges, sizeof(edge), cmp_func);
+
+    set* s = SetInit(n_nodes);
+
+    // vector of edges of the MST
+    edge* v = (edge*) malloc(sizeof(edge) * n_nodes);
+    *size = 0;
+
+    for (int i = 0; i < n_edges; i++) {
+        edge top = edges[i];
+        if (SetFind(s, top.from) != SetFind(s, top.to)){
+            v[(*size)++] = edges[i];
+            SetUnion(s, top.from, top.to);
+        }
+    }
+
     SetFree(s);
 
     return v;
