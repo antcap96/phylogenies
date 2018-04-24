@@ -4,7 +4,7 @@
 #include <assert.h>
 
 static size_t build_tree(RRHeap* h, group* root, size_t idx,
-                         size_t r, size_t max_rank);
+                         size_t current_rank);
 static void RRHeapGoodSiblingTransform(RRHeap* h,group* a, group* s);
 static void RRHeapActiveSiblingTransform(RRHeap* h,group* a, group* s);
 static void RRHeapPairTransform(RRHeap* h,group* a);
@@ -70,8 +70,8 @@ RRHeap* RRHeapMake(size_t type_size, void* data, size_t max_size,
     h->A = (group**) malloc(sizeof(group*) * (h->root.rank));
     memset(h->A, 0, sizeof(group*) * (h->root.rank));
 
-    // yes I do: max_rank * (num_groups + root)
-    h->root.children = (group**) malloc(sizeof(group*) * h->root.rank * (g+1));
+    // `max_rank of a node diferent form root` * (num_groups + root) + 1
+    h->root.children = (group**) malloc(sizeof(group*) * (r * (g+1) + 1));
     
     // set the B-trees to NULL, fill only the necessary ones
     for (size_t i = 0; i < r+1; ++i)
@@ -80,7 +80,7 @@ RRHeap* RRHeapMake(size_t type_size, void* data, size_t max_size,
     size_t idx = 0;
     while (idx < g) {
         h->root.children[r] = &h->index_to_group[idx];
-        idx = build_tree(h, &h->root, idx, r, log_g + 1);
+        idx = build_tree(h, &h->root, idx, r);
         if (idx != g)
             r = (log_base_2(g-idx));
     }
@@ -90,21 +90,20 @@ RRHeap* RRHeapMake(size_t type_size, void* data, size_t max_size,
 
 
 // internal function
-// max_rank is always log_g + 1
 // sets children and parent for the tree
 static size_t build_tree(RRHeap* h,  group* parent, size_t idx,
-                         size_t r,  size_t max_rank) {
+                         size_t current_rank) {
     
-    group* this_group = &h->index_to_group[idx];
-    this_group->parent = parent;
+    group* current_group = &h->index_to_group[idx];
+    current_group->parent = parent;
     idx++;
 
-    this_group->children = h->root.children + (idx * max_rank);
-    this_group->rank = r;
+    current_group->children = h->root.children + 1 + (idx * (h->root.rank-1));
+    current_group->rank = current_rank;
 
-    for (size_t i = 0; i < r; ++i) {
-        this_group->children[i] = &h->index_to_group[idx];
-        idx = build_tree(h, this_group, idx, i, max_rank);
+    for (size_t child_rank = 0; child_rank < current_rank; ++child_rank) {
+        current_group->children[child_rank] = &h->index_to_group[idx];
+        idx = build_tree(h, current_group, idx, child_rank);
     }
 
     return idx;
@@ -204,6 +203,7 @@ static void RRHeapFindSmallest(RRHeap* h) {
     }
 }
 
+// swap the references of x and y
 static void swap_groups(group** x, group** y) {
     group* tmp = *x;
     *x = *y;
@@ -223,8 +223,8 @@ static void RRHeapPairTransform(RRHeap* h, group* a) {
     group* pb = b->parent;
     group* gb = pb->parent;
 
-    --pb->rank;
-    --pa->rank;
+    --pb->rank; // remove b from pb
+    --pa->rank; // remove a form pa
     
     // Note: a, pa, b, pb all have rank r
     if (RRHeapGroupCompare(h, pb, pa) < 0) {
@@ -233,7 +233,7 @@ static void RRHeapPairTransform(RRHeap* h, group* a) {
         swap_groups(&ga, &gb);
     }
 
-    // now k(pa) <= k(pb)
+    // now pa <= pb
     // make pb the rank r child of pa
     pa->children[pa->rank++] = pb;
     pb->parent = pa;
@@ -276,7 +276,6 @@ static void RRHeapActiveSiblingTransform(RRHeap* h, group* a, group* s) {
     RRHeapPromote(h, c);
 }
 
-
 static void RRHeapGoodSiblingTransform(RRHeap* h, group* a, group* s) {
     size_t r = a->rank;
     group* c = s->children[s->rank-1];
@@ -310,7 +309,6 @@ static void RRHeapGoodSiblingTransform(RRHeap* h, group* a, group* s) {
     }
 }
 
-
 static group* RRHeapCombine(RRHeap* h, group* a, group* b) {
     if (RRHeapGroupCompare(h, b, a) < 0)
         swap_groups(&a, &b);
@@ -319,7 +317,6 @@ static group* RRHeapCombine(RRHeap* h, group* a, group* b) {
     RRHeapClean(h, a);
     return a;
 }
-
 
 static void RRHeapClean(RRHeap*h, group* q) {
     if (q->rank < 2)
@@ -384,6 +381,7 @@ void RRHeapPop(RRHeap* h) {
         }
     }
 
+    // remove all of x children
     x->rank = 0;
 
     // create group y that is the result of combining prior
