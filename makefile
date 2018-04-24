@@ -37,7 +37,7 @@ OBJ_DIR = ./bin/
 
 version ?= c11
 # final name for the executable
-EXECUTABLE = ./prog.exe
+EXECUTABLE = ./project
 # LIB_FILES := ...
 # LIB_INCLUDES := ...
 
@@ -72,11 +72,11 @@ endif
 #CC_ROOT = $(shell root-config --cflags)
 #endif
 # warning flags for linking and compiling
-LD_WARNINGS = -Wall -Wextra
+LD_WARNINGS = 
 CC_WARNINGS = $(LD_WARNINGS)
 
-LD_FLAGS := $(LD_WARNINGS) $(OPTIMIZATION) -std=$(version) $(LD_ROOT)
-CC_FLAGS := -MMD $(CC_WARNINGS) $(OPTIMIZATION) -std=$(version) $(CC_ROOT)
+LD_FLAGS := $(LD_WARNINGS) $(OPTIMIZATION) -std=$(version)
+CC_FLAGS := -MMD $(CC_WARNINGS) $(OPTIMIZATION) -std=$(version)
 # NOTE: -MMD flags creates .d files in the same folder as the .o which contain\
         makefile code with the dependencies for the the compiled file (aka the\
         included files)
@@ -105,7 +105,7 @@ $(OBJ_FILES): | $(OBJ_DIR)
 
 $(OBJ_DIR):
 	@mkdir -p $(OBJ_DIR)
-	@echo $(CYAN) created $(OBJ_DIR) $(NOFORM)
+	@#@echo $(CYAN) created $(OBJ_DIR) $(NOFORM)
 # NOTE: for information on what the | is doing over there:
 # https://www.gnu.org/software/make/manual/make.html#Prerequisite-Types
 

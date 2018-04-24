@@ -16,6 +16,7 @@ static void RRHeapPromote(RRHeap* h, group* a);
 
 // gives position of largest bit = 1
 size_t log_base_2(size_t n) {
+    assert(n != 0);
     size_t leading_zeroes = 0;
     while(1) {
         size_t next = n << 1;
@@ -64,13 +65,13 @@ RRHeap* RRHeapMake(size_t type_size, void* data, size_t max_size,
     }
 
 
-    h->A = (group**) malloc(sizeof(group*) * (r+1));
-    memset(h->A, 0, sizeof(group*) * (r+1));
     h->root.rank = r+1;
     h->root.parent = NULL;
+    h->A = (group**) malloc(sizeof(group*) * (h->root.rank));
+    memset(h->A, 0, sizeof(group*) * (h->root.rank));
 
     // yes I do: max_rank * (num_groups + root)
-    h->root.children = (group**) malloc(sizeof(group*) * (log_g+1) * (g+1));
+    h->root.children = (group**) malloc(sizeof(group*) * h->root.rank * (g+1));
     
     // set the B-trees to NULL, fill only the necessary ones
     for (size_t i = 0; i < r+1; ++i)
@@ -136,10 +137,8 @@ void RRHeapUpdate(RRHeap* h, size_t id) {
 }
 
 static void RRHeapPromote(RRHeap* h, group* a) {
-    assert(a != NULL);
     size_t r = a->rank;
     group* p = a->parent;
-    assert(p != NULL);
     
     if (!(RRHeapGroupCompare(h, a, p) < 0)){
         if(h->A[r] == a)
@@ -215,31 +214,18 @@ static void RRHeapPairTransform(RRHeap* h, group* a) {
     size_t r = a->rank;
 
     group* pa = a->parent;
-    assert(pa != NULL);
-
     group* ga = pa->parent;
-    assert(ga != NULL);
 
-    assert(h->A[r] != NULL);
     group* b = h->A[r];
-    assert(b != NULL);
 
     h->A[r] = NULL;
 
     group* pb = b->parent;
-    assert(pb != NULL);
-
     group* gb = pb->parent;
-    assert(gb != NULL);
 
-    // Remove a and b from their parents
-    assert(b == pb->children[pb->rank-1]); // Guaranteed because pb is active
     --pb->rank;
-
-    // Guaranteed by caller
-    assert(a == pa->children[pa->rank-1]);
     --pa->rank;
-
+    
     // Note: a, pa, b, pb all have rank r
     if (RRHeapGroupCompare(h, pb, pa) < 0) {
         swap_groups(&a, &b);
@@ -249,7 +235,6 @@ static void RRHeapPairTransform(RRHeap* h, group* a) {
 
     // now k(pa) <= k(pb)
     // make pb the rank r child of pa
-    assert(r == pa->rank);
     pa->children[pa->rank++] = pb;
     pb->parent = pa;
 
@@ -257,7 +242,6 @@ static void RRHeapPairTransform(RRHeap* h, group* a) {
     group* c = RRHeapCombine(h, a, b);
 
     // make c the rank r+1 child of gb
-    assert(gb->rank > r+1);
     gb->children[r+1] = c;
     c->parent = gb;
 
@@ -274,12 +258,8 @@ static void RRHeapActiveSiblingTransform(RRHeap* h, group* a, group* s) {
     group* p = a->parent;
     group* g = p->parent;
 
-    // remove a, s from their parent
-    assert(s->parent == p);
-    assert(p->children[p->rank-1] == s);
-    --p->rank;
-    assert(p->children[p->rank-1] == a);
-    --p->rank;
+    --p->rank; // remove s from p
+    --p->rank; // remove a form p
 
     size_t r = a->rank;
     h->A[r+1] = NULL;
@@ -287,10 +267,8 @@ static void RRHeapActiveSiblingTransform(RRHeap* h, group* a, group* s) {
     group* c = RRHeapCombine(h, a, s);
 
     // make c the rank right most child of g
-    assert(g->children[r+2] == p);
     g->children[r+2] = c;
     c->parent = g;
-    
 
     if (h->A[r+2] == p)
         h->A[r+2] = NULL;
@@ -302,7 +280,6 @@ static void RRHeapActiveSiblingTransform(RRHeap* h, group* a, group* s) {
 static void RRHeapGoodSiblingTransform(RRHeap* h, group* a, group* s) {
     size_t r = a->rank;
     group* c = s->children[s->rank-1];
-    assert(c->rank == r);
     if (h->A[r] == c) {
         h->A[r] = NULL;
         group* p = a->parent;
@@ -315,7 +292,6 @@ static void RRHeapGoodSiblingTransform(RRHeap* h, group* a, group* s) {
         p->children[r] = s;
 
         // combine a, c and let the result be the right most child of p
-        assert(p->rank > r+1);
         group* x = RRHeapCombine(h, a, c);
         x->parent = p;
         p->children[r+1] = x;
@@ -336,7 +312,6 @@ static void RRHeapGoodSiblingTransform(RRHeap* h, group* a, group* s) {
 
 
 static group* RRHeapCombine(RRHeap* h, group* a, group* b) {
-    assert(a->rank == b->rank);
     if (RRHeapGroupCompare(h, b, a) < 0)
         swap_groups(&a, &b);
     a->children[a->rank++] = b;
@@ -361,7 +336,6 @@ static void RRHeapClean(RRHeap*h, group* q) {
     size_t s = q->rank - 2;
     group* x = q->children[s];
     group* y = qp->children[s];
-    assert(s == x->rank);
 
     // If x is active, swap x and y
     if (h->A[s] == x) {
@@ -428,7 +402,6 @@ void RRHeapPop(RRHeap* h) {
         y->parent = p;
         p->children[r] = y;
 
-        assert(r == y->rank);
         if (h->A[y->rank] == x)
             h->A[y->rank] = (RRHeapGroupCompare(h, y, p) < 0)? y : NULL;
     }
