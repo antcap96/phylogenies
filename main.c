@@ -3,6 +3,7 @@
 #include <string.h>
 #include <limits.h>
 #include <stdint.h>
+#include <time.h>
 #include "binary_heap.h"
 #include "rank_relaxed_heap.h"
 #include "set.h"
@@ -150,7 +151,7 @@ edge* Prim(edge* edges, int n_edges, int n_nodes,
     size_t* vertex_idx;
     vertex_idx = (size_t*) malloc((n_nodes+1) * sizeof(size_t));
 
-    // sort O(m log(m))
+    // O(m log(m))
     qsort(edges, n_edges, sizeof(edge), directedcmp);
 
     // Fill the vertex_idx O(m)
@@ -167,6 +168,8 @@ edge* Prim(edge* edges, int n_edges, int n_nodes,
     for (int i = j+1; i < n_nodes+1; i++)
         vertex_idx[i] = n_edges;
 
+    clock_t t1 = clock();
+    
     binheap *q;
 
     // vector of edges that will be the output as well as the one used
@@ -218,6 +221,9 @@ edge* Prim(edge* edges, int n_edges, int n_nodes,
     BINHEAP_FREE(q);
     free(vertex_idx);
     free(fixed);
+
+    printf("BinHeapPrim:%lg\n",(clock()-t1)/(double) CLOCKS_PER_SEC);
+
     return v;
 }
 
@@ -229,11 +235,13 @@ edge* Prim2(edge* edges, int n_edges, int n_nodes,
     // vertex_idx[i] will be the index of the begining of edges from i
     // vertex_idx[i+1] will be the index after the end
 
+    clock_t startSort = clock();
+
     // O(n)
     size_t* vertex_idx;
     vertex_idx = (size_t*) malloc((n_nodes+1) * sizeof(size_t));
 
-    // sort O(m log(m))
+    // O(m log(m))
     qsort(edges, n_edges, sizeof(edge), directedcmp);
 
     // Fill the vertex_idx O(m)
@@ -249,6 +257,10 @@ edge* Prim2(edge* edges, int n_edges, int n_nodes,
     }
     for (int i = j+1; i < n_nodes+1; i++)
         vertex_idx[i] = n_edges;
+
+    printf("Sort:%lf\n",(clock()-startSort)/(double) CLOCKS_PER_SEC);
+
+    clock_t startRRHeap = clock();
 
     RRHeap *q;
 
@@ -282,7 +294,7 @@ edge* Prim2(edge* edges, int n_edges, int n_nodes,
                     cmp_func(&edges[i], &v[edges[i].to]) < 0){
                     // update entries in the heap if better edge is found
                     v[edges[i].to] = edges[i];
-                    RRHeapInsert(q, edges[i].to); //same as push
+                    RRHeapInsert(q, edges[i].to);
                 }
             }
 
@@ -298,8 +310,11 @@ edge* Prim2(edge* edges, int n_edges, int n_nodes,
     *size = n_nodes;
 
     RRHeapFree(q);
-    free(vertex_idx);
     free(fixed);
+    printf("RRHeapPrim:%lg\n",(clock()-startRRHeap)/(double) CLOCKS_PER_SEC);
+
+    free(vertex_idx);
+
     return v;
 }
 
@@ -313,6 +328,8 @@ int main(){
     int i, j, k;
 
     scanf("%d\n", &n_str);
+
+    clock_t startRead = clock();
 
     v_str = (char**) malloc(n_str * sizeof(char*));
 
@@ -331,6 +348,8 @@ int main(){
     a->size = 0;
     ArrayFree(a);
 
+    printf("FirstRead:%lg\n",(clock()-startRead)/(double) CLOCKS_PER_SEC);
+
     for (i = 1; i < n_str; i++){
         v_str[i] = (char*) malloc(str_size * sizeof(char));
     }
@@ -340,6 +359,8 @@ int main(){
     }
 
     scanf("%d", &max_dist);
+
+    printf("AllRead:%lg\n",(clock()-startRead)/(double) CLOCKS_PER_SEC);
 
     edges = (edge*) malloc(n_str*(n_str-1)* sizeof(edge));
 
@@ -370,6 +391,7 @@ int main(){
         free(v_str[i]);
     free(v_str);
 
+    printf("Distances:%lg\n",(clock()-startRead)/(double) CLOCKS_PER_SEC);
 
     edge* v = Prim2(edges, n_edges, n_str, edgecmp, &i);
 
@@ -378,8 +400,8 @@ int main(){
     for (j = 0; j < i; j++) {
         if(v[j].from == v[j].to)
             continue;
-        printf("%lu %lu\n", MIN(v[j].from, v[j].to)+1,
-                            MAX(v[j].to, v[j].from)+1);
+        //printf("%lu %lu\n", MIN(v[j].from, v[j].to)+1,
+        //                    MAX(v[j].to, v[j].from)+1);
     }
 
     free(v);
